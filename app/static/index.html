@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PodHarvest — Podcast Manager for Jellyfin</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #181b24;
+      --surface-2: #222634;
+      --border: #2e3446;
+      --text: #e8ecf4;
+      --muted: #939db4;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --green: #10b981;
+      --red: #ef4444;
+      --amber: #f59e0b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.15rem; }
+    .badge {
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      display: inline-block;
+    }
+    .badge.ok { color: var(--green); border-color: rgba(16,185,129,.4); }
+    .badge.warn { color: var(--amber); border-color: rgba(245,158,11,.4); }
+    .badge.err { color: var(--red); border-color: rgba(239,68,68,.4); }
+    nav {
+      display: flex;
+      gap: 8px;
+      background: var(--surface);
+      padding: 10px 24px;
+      border-bottom: 1px solid var(--border);
+    }
+    nav button {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--muted);
+      padding: 8px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    nav button.active {
+      background: var(--surface-2);
+      border-color: var(--border);
+      color: var(--text);
+    }
+    main { max-width: 1180px; margin: 0 auto; padding: 24px; }
+    .tab { display: none; }
+    .tab.active { display: block; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    input[type="text"], input[type="number"], select {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 9px 12px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+    }
+    input[type="text"] { flex: 1; min-width: 240px; }
+    button.btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 9px 15px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button.btn:hover:not(:disabled) { background: var(--accent-hover); }
+    button.btn:disabled { opacity: 0.7; cursor: wait; }
+    button.btn.secondary {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    button.btn.subscribed {
+      background: rgba(16, 185, 129, 0.16);
+      border: 1px solid rgba(16, 185, 129, 0.45);
+      color: var(--green);
+      opacity: 1;
+      cursor: default;
+    }
+    button.btn.downloading-btn {
+      background: rgba(245, 158, 11, 0.16);
+      border: 1px solid rgba(245, 158, 11, 0.45);
+      color: var(--amber);
+      opacity: 1;
+      cursor: wait;
+    }
+    button.btn.danger { background: rgba(239,68,68,.15); color: var(--red); border: 1px solid rgba(239,68,68,.4); }
+    button.btn.sm { padding: 5px 10px; font-size: 0.82rem; white-space: nowrap; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 16px;
+      margin-top: 18px;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .pod-head { display: flex; gap: 12px; align-items: flex-start; }
+    .pod-head img {
+      width: 68px;
+      height: 68px;
+      border-radius: 8px;
+      object-fit: cover;
+      background: var(--surface-2);
+      flex-shrink: 0;
+    }
+    .pod-title { font-weight: 700; font-size: 1rem; margin: 0 0 2px; }
+    .pod-author { color: var(--muted); font-size: 0.85rem; }
+    .pod-desc {
+      color: var(--muted);
+      font-size: 0.85rem;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    table { width: 100%; border-collapse: collapse; margin-top: 14px; background: var(--surface); border-radius: 10px; overflow: hidden; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+    th { background: var(--surface-2); color: var(--muted); font-weight: 600; }
+    .settings-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 18px;
+    }
+    .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+    .field label { font-size: 0.88rem; font-weight: 600; color: var(--muted); }
+    .check-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,.7);
+      display: none; align-items: center; justify-content: center; padding: 20px; z-index: 50;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      max-width: 920px;
+      width: 100%;
+      max-height: 85vh;
+      overflow-y: auto;
+      padding: 20px;
+    }
+    .toast {
+      position: fixed; bottom: 20px; right: 20px;
+      background: var(--surface-2); border: 1px solid var(--accent);
+      padding: 10px 16px; border-radius: 8px; display: none; z-index: 60;
+    }
+    code { background: var(--surface-2); padding: 2px 6px; border-radius: 4px; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span>PodHarvest</span>
+      <span class="badge" id="statusBadge">Loading...</span>
+    </div>
+    <div class="row">
+      <button class="btn secondary sm" onclick="triggerPoll()">Check All Feeds Now</button>
+    </div>
+  </header>
+
+  <nav>
+    <button class="active" onclick="switchTab('discover', this)">Discover</button>
+    <button onclick="switchTab('subscriptions', this)">Subscriptions</button>
+    <button onclick="switchTab('files', this)">Files &amp; Storage</button>
+    <button onclick="switchTab('settings', this)">Settings</button>
+  </nav>
+
+  <main>
+    <!-- DISCOVER TAB -->
+    <section id="tab-discover" class="tab active">
+      <div class="row">
+        <input type="text" id="searchInput" placeholder="Search podcasts (4thepeople.live -> Apple iTunes) or paste RSS feed URL..." onkeydown="if(event.key==='Enter') runSearch()" />
+        <button class="btn" onclick="runSearch()">Search</button>
+        <a class="btn secondary" href="/api/opml/export">Export OPML</a>
+        <label class="btn secondary" style="cursor:pointer;">
+          Import OPML
+          <input type="file" accept=".opml,.xml" style="display:none" onchange="importOpml(this)" />
+        </label>
+      </div>
+      <p id="searchMeta" style="color:var(--muted); font-size:0.88rem; margin-top:10px;"></p>
+      <div id="searchResults" class="grid"></div>
+    </section>
+
+    <!-- SUBSCRIPTIONS TAB -->
+    <section id="tab-subscriptions" class="tab">
+      <div id="subsList" class="grid"></div>
+    </section>
+
+    <!-- FILES TAB -->
+    <section id="tab-files" class="tab">
+      <div class="row" style="justify-content:space-between;">
+        <div>
+          <strong id="storageSummary">Scanning storage...</strong>
+        </div>
+        <div class="row">
+          <button class="btn secondary sm" onclick="loadFiles()">Refresh</button>
+          <button class="btn danger sm" onclick="runCleanup()">Run Retention Cleanup Now</button>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Folder</th>
+            <th>Filename</th>
+            <th>Size</th>
+            <th>Modified (UTC)</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="filesTableBody"></tbody>
+      </table>
+    </section>
+
+    <!-- SETTINGS TAB -->
+    <section id="tab-settings" class="tab">
+      <div class="settings-grid">
+        <div class="card">
+          <h3 style="margin:0 0 8px;">Indexing &amp; Search Sources</h3>
+          <div class="field">
+            <label>Primary Index URL</label>
+            <input type="text" id="set_primary_index_url" />
+          </div>
+          <div class="check-row">
+            <input type="checkbox" id="set_enable_primary_index" />
+            <label for="set_enable_primary_index">Use primary index first (podcast.4thepeople.live)</label>
+          </div>
+          <div class="check-row">
+            <input type="checkbox" id="set_enable_itunes_fallback" />
+            <label for="set_enable_itunes_fallback">Fallback to Apple iTunes Search API</label>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 style="margin:0 0 8px;">Automation &amp; Retention</h3>
+          <div class="check-row">
+            <input type="checkbox" id="set_auto_download" />
+            <label for="set_auto_download">Automatically download new episodes</label>
+          </div>
+          <div class="field">
+            <label>Polling Interval (minutes)</label>
+            <input type="number" id="set_poll_interval_minutes" min="5" max="10080" />
+          </div>
+          <div class="field">
+            <label>Initial Episodes to Download on Subscribe (0 = none)</label>
+            <input type="number" id="set_initial_episodes" min="0" max="50" />
+          </div>
+          <div class="field">
+            <label>Max Episodes to Keep per Show (0 = unlimited)</label>
+            <input type="number" id="set_max_episodes_per_show" min="0" max="500" />
+          </div>
+          <div class="field">
+            <label>Auto-Delete Episodes Older Than (days, 0 = never)</label>
+            <input type="number" id="set_retention_days" min="0" max="3650" />
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 style="margin:0 0 8px;">Jellyfin Storage &amp; Naming</h3>
+          <div class="field">
+            <label>Folder Template (tokens: <code>{podcast}</code> <code>{year}</code>)</label>
+            <input type="text" id="set_folder_template" oninput="updatePathPreview()" />
+          </div>
+          <div class="field">
+            <label>Filename Template (tokens: <code>{date}</code> <code>{year}</code> <code>{month}</code> <code>{day}</code> <code>{title}</code> <code>{ext}</code>)</label>
+            <input type="text" id="set_filename_template" oninput="updatePathPreview()" />
+          </div>
+          <p style="font-size:0.83rem; color:var(--muted); margin:0 0 10px;">
+            Preview: <code id="pathPreview"></code>
+          </p>
+          <div class="check-row">
+            <input type="checkbox" id="set_save_cover_art" />
+            <label for="set_save_cover_art">Save show artwork as <code>folder.jpg</code></label>
+          </div>
+          <div class="check-row">
+            <input type="checkbox" id="set_write_nfo" />
+            <label for="set_write_nfo">Write Jellyfin episode <code>.nfo</code> sidecar files</label>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:16px;">
+        <button class="btn" onclick="saveSettings()">Save All Settings</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- EPISODES / PREVIEW MODAL -->
+  <div class="modal-backdrop" id="modalBackdrop" onclick="if(event.target===this) closeModal()">
+    <div class="modal">
+      <div class="row" style="justify-content:space-between; margin-bottom:12px;">
+        <h3 id="modalTitle" style="margin:0;">Episodes</h3>
+        <div class="row" id="modalActions">
+          <button class="btn secondary sm" onclick="closeModal()">Close</button>
+        </div>
+      </div>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let subscribedUrls = new Set();
+    let previewState = null; // { feed, episodes: [...] }
+    let activeShowState = null; // { podcastId, title, episodes: [...] }
+    let progressTimer = null;
+
+    function normUrl(url) {
+      return String(url || "").trim().replace(/\/+$/, "").toLowerCase();
+    }
+
+    function isFeedSubscribed(feedUrl) {
+      return subscribedUrls.has(normUrl(feedUrl));
+    }
+
+    async function refreshSubscribedUrls() {
+      try {
+        const res = await fetch("/api/podcasts");
+        if (!res.ok) return;
+        const pods = await res.json();
+        subscribedUrls = new Set(pods.map(p => normUrl(p.feed_url)));
+        syncSubscribeButtonsInDom();
+      } catch (_) {}
+    }
+
+    function syncSubscribeButtonsInDom() {
+      document.querySelectorAll("button[data-sub-feed]").forEach(btn => {
+        const feedUrl = btn.getAttribute("data-sub-feed");
+        if (isFeedSubscribed(feedUrl)) {
+          btn.className = "btn subscribed sm";
+          btn.textContent = "✓ Subscribed";
+          btn.disabled = true;
+        }
+      });
+    }
+
+    function fmtDuration(raw) {
+      const s = String(raw ?? "").trim();
+      if (!s) return "—";
+      if (/^\d+h\s+\d+m$/.test(s) || /^\d+m$/.test(s)) return s;
+
+      let totalSec = 0;
+      if (s.includes(":")) {
+        const parts = s.split(":").map(Number);
+        if (parts.some(Number.isNaN)) return s;
+        if (parts.length === 3) totalSec = parts[0] * 3600 + parts[1] * 60 + parts[2];
+        else if (parts.length === 2) totalSec = parts[0] * 60 + parts[1];
+        else return s;
+      } else if (!Number.isNaN(Number(s))) {
+        totalSec = Number(s);
+      } else {
+        return s;
+      }
+
+      if (totalSec <= 0) return "—";
+      const totalMin = Math.max(1, Math.round(totalSec / 60));
+      const hrs = Math.floor(totalMin / 60);
+      const mins = totalMin % 60;
+      return hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
+    }
+
+    function toast(msg) {
+      const el = document.getElementById("toast");
+      el.textContent = msg;
+      el.style.display = "block";
+      setTimeout(() => { el.style.display = "none"; }, 3200);
+    }
+
+    function fmtBytes(bytes) {
+      if (!bytes) return "0 B";
+      const units = ["B", "KB", "MB", "GB", "TB"];
+      let i = 0;
+      while (bytes >= 1024 && i < units.length - 1) { bytes /= 1024; i++; }
+      return `${bytes.toFixed(1)} ${units[i]}`;
+    }
+
+    function esc(str) {
+      return String(str ?? "").replace(/[&<>"']/g, c => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[c]));
+    }
+
+    function formatProgressText(prog) {
+      if (!prog) return "downloading...";
+      if (prog.total_bytes > 0 && prog.percent !== null && prog.percent !== undefined) {
+        return `downloading ${prog.percent}% (${fmtBytes(prog.downloaded_bytes)} / ${fmtBytes(prog.total_bytes)})`;
+      }
+      if (prog.downloaded_bytes > 0) {
+        return `downloading ${fmtBytes(prog.downloaded_bytes)}`;
+      }
+      return "downloading 0%";
+    }
+
+    function ensureProgressPolling() {
+      if (progressTimer) return;
+      progressTimer = setInterval(pollDownloadProgress, 600);
+    }
+
+    function stopProgressPolling() {
+      if (progressTimer) {
+        clearInterval(progressTimer);
+        progressTimer = null;
+      }
+    }
+
+    async function pollDownloadProgress() {
+      try {
+        const res = await fetch("/api/downloads/progress");
+        if (!res.ok) return;
+        const progressMap = await res.json();
+
+        let anyDownloading = false;
+        Object.values(progressMap).forEach(p => {
+          if (p.status === "downloading") anyDownloading = true;
+        });
+
+        let shouldRefreshSubs = false;
+
+        if (previewState) {
+          previewState.episodes.forEach((ep, idx) => {
+            const p = progressMap[ep.audio_url];
+            if (!p) return;
+            const prevStatus = ep.status;
+            ep.status = p.status;
+            if (p.file_path) ep.file_path = p.file_path;
+            if (p.file_size) ep.file_size = p.file_size;
+            if (p.error_msg) ep.error_msg = p.error_msg;
+
+            const statusCell = document.getElementById(`prev-status-${idx}`);
+            const actionCell = document.getElementById(`prev-action-${idx}`);
+            if (statusCell && actionCell) {
+              statusCell.innerHTML = renderPreviewStatusHtml(ep, p);
+              if (prevStatus !== ep.status) {
+                actionCell.innerHTML = renderPreviewActionHtml(ep, idx);
+                if (ep.status === "downloaded") shouldRefreshSubs = true;
+              }
+            }
+          });
+        }
+
+        if (activeShowState) {
+          activeShowState.episodes.forEach((ep, idx) => {
+            const p = progressMap[ep.audio_url];
+            if (!p) return;
+            const prevStatus = ep.status;
+            ep.status = p.status;
+            if (p.file_path) ep.file_path = p.file_path;
+            if (p.file_size) ep.file_size = p.file_size;
+            if (p.error_msg) ep.error_msg = p.error_msg;
+
+            const statusCell = document.getElementById(`show-status-${idx}`);
+            const actionCell = document.getElementById(`show-action-${idx}`);
+            if (statusCell && actionCell) {
+              statusCell.innerHTML = renderShowStatusHtml(ep, p);
+              if (prevStatus !== ep.status) {
+                actionCell.innerHTML = renderShowActionHtml(ep, idx);
+                if (ep.status === "downloaded") shouldRefreshSubs = true;
+              }
+            }
+          });
+        }
+
+        if (shouldRefreshSubs && document.getElementById("tab-subscriptions").classList.contains("active")) {
+          loadSubscriptions();
+        }
+
+        if (!anyDownloading) {
+          stopProgressPolling();
+        }
+      } catch (_) {}
+    }
+
+    function switchTab(name, btn) {
+      document.querySelectorAll("nav button").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+      document.getElementById(`tab-${name}`).classList.add("active");
+      if (name === "subscriptions") loadSubscriptions();
+      if (name === "files") loadFiles();
+      if (name === "settings") loadSettings();
+    }
+
+    async function refreshStatus() {
+      try {
+        const res = await fetch("/api/status");
+        const data = await res.json();
+        const badge = document.getElementById("statusBadge");
+        badge.textContent = data.running ? "Polling feeds..." : data.last_message;
+        badge.className = data.running ? "badge warn" : "badge ok";
+      } catch (_) {}
+    }
+
+    async function triggerPoll() {
+      await fetch("/api/poll", { method: "POST" });
+      toast("Feed refresh started");
+      refreshStatus();
+    }
+
+    async function runSearch() {
+      const q = document.getElementById("searchInput").value.trim();
+      if (!q) return;
+      const meta = document.getElementById("searchMeta");
+      const grid = document.getElementById("searchResults");
+      meta.textContent = "Searching...";
+      grid.innerHTML = "";
+
+      await refreshSubscribedUrls();
+
+      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+      if (!res.ok) {
+        meta.textContent = "Search failed. Check the URL or network connectivity.";
+        return;
+      }
+      const data = await res.json();
+      meta.textContent = `Found ${data.results.length} result(s) via ${data.source}`;
+
+      grid.innerHTML = data.results.map(item => {
+        const sub = Boolean(item.subscribed) || isFeedSubscribed(item.feed_url);
+        if (sub) subscribedUrls.add(normUrl(item.feed_url));
+        const subBtn = sub
+          ? `<button class="btn subscribed sm" data-sub-feed="${esc(item.feed_url)}" disabled>✓ Subscribed</button>`
+          : `<button class="btn sm" data-sub-feed="${esc(item.feed_url)}" onclick='subscribePodcast(${JSON.stringify(item)}, this)'>Subscribe</button>`;
+
+        return `
+          <div class="card">
+            <div class="pod-head">
+              <img src="${esc(item.artwork_url)}" alt="" onerror="this.style.visibility='hidden'" />
+              <div>
+                <div class="pod-title">${esc(item.title)}</div>
+                <div class="pod-author">${esc(item.author)}</div>
+                <span class="badge" style="margin-top:4px; display:inline-block;">${esc(item.source)}</span>
+              </div>
+            </div>
+            <div class="pod-desc">${esc(item.description)}</div>
+            <div class="row" style="margin-top:auto;">
+              <button class="btn secondary sm" onclick='previewFeed(${JSON.stringify(item.feed_url)})'>Preview</button>
+              ${subBtn}
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderPreviewStatusHtml(ep, prog = null) {
+      if (ep.status === "downloaded") {
+        return `<span class="badge ok">downloaded ${ep.file_size ? `(${fmtBytes(ep.file_size)})` : ""}</span>`;
+      }
+      if (ep.status === "downloading") {
+        return `<span class="badge warn">${esc(formatProgressText(prog))}</span>`;
+      }
+      if (ep.status === "failed") {
+        return `<span class="badge err">failed</span>`;
+      }
+      return `<span class="badge">${esc(ep.status || "new")}</span>`;
+    }
+
+    function renderPreviewActionHtml(ep, idx) {
+      if (ep.status === "downloaded") {
+        return `<button class="btn danger sm" onclick="deletePreviewEp(${idx})">Delete File</button>`;
+      }
+      if (ep.status === "downloading") {
+        return `<button class="btn downloading-btn sm" disabled>Downloading...</button>`;
+      }
+      return `<button class="btn sm" onclick="downloadPreviewEp(${idx})">Download</button>`;
+    }
+
+    async function previewFeed(feedUrl) {
+      activeShowState = null;
+      previewState = null;
+      document.getElementById("modalTitle").textContent = "Loading feed preview...";
+      document.getElementById("modalActions").innerHTML = `<button class="btn secondary sm" onclick="closeModal()">Close</button>`;
+      document.getElementById("modalBody").innerHTML = "";
+      document.getElementById("modalBackdrop").classList.add("open");
+
+      const res = await fetch(`/api/preview?feed_url=${encodeURIComponent(feedUrl)}`);
+      if (!res.ok) {
+        document.getElementById("modalBody").textContent = "Could not load RSS feed.";
+        return;
+      }
+      const data = await res.json();
+      previewState = { feed: data, episodes: data.episodes };
+
+      const sub = Boolean(data.subscribed) || isFeedSubscribed(data.feed_url);
+      if (sub) subscribedUrls.add(normUrl(data.feed_url));
+
+      const subPayload = {
+        title: data.title,
+        author: data.author,
+        description: data.description,
+        artwork_url: data.artwork_url,
+        feed_url: data.feed_url,
+      };
+      const modalSubBtn = sub
+        ? `<button class="btn subscribed sm" data-sub-feed="${esc(data.feed_url)}" disabled>✓ Subscribed</button>`
+        : `<button class="btn sm" data-sub-feed="${esc(data.feed_url)}" onclick='subscribePodcast(${JSON.stringify(subPayload)}, this)'>Subscribe</button>`;
+
+      document.getElementById("modalTitle").textContent = data.title;
+      document.getElementById("modalActions").innerHTML = `
+        ${modalSubBtn}
+        <button class="btn secondary sm" onclick="closeModal()">Close</button>
+      `;
+
+      document.getElementById("modalBody").innerHTML = `
+        <p style="color:var(--muted); margin-top:0;">${esc(data.description)}</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Episode</th>
+              <th>Duration</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.episodes.map((ep, idx) => `
+              <tr>
+                <td style="white-space:nowrap;">${esc(ep.published_at)}</td>
+                <td>
+                  <div>${esc(ep.title)}</div>
+                  ${ep.error_msg ? `<div style="color:var(--red); font-size:0.78rem;">${esc(ep.error_msg)}</div>` : ""}
+                </td>
+                <td style="white-space:nowrap;">${esc(fmtDuration(ep.duration))}</td>
+                <td id="prev-status-${idx}">${renderPreviewStatusHtml(ep)}</td>
+                <td id="prev-action-${idx}">${renderPreviewActionHtml(ep, idx)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+
+      if (data.episodes.some(e => e.status === "downloading")) {
+        ensureProgressPolling();
+        pollDownloadProgress();
+      }
+    }
+
+    async function downloadPreviewEp(idx) {
+      if (!previewState) return;
+      const ep = previewState.episodes[idx];
+      const feed = previewState.feed;
+      if (!ep || ep.status === "downloading") return;
+
+      ep.status = "downloading";
+      ep.error_msg = "";
+      const statusCell = document.getElementById(`prev-status-${idx}`);
+      const actionCell = document.getElementById(`prev-action-${idx}`);
+      if (statusCell) statusCell.innerHTML = renderPreviewStatusHtml(ep, { downloaded_bytes: 0, total_bytes: 0, percent: 0 });
+      if (actionCell) actionCell.innerHTML = renderPreviewActionHtml(ep, idx);
+
+      ensureProgressPolling();
+
+      const res = await fetch("/api/preview/download", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          podcast_title: feed.title,
+          podcast_artwork: feed.artwork_url || "",
+          feed_url: feed.feed_url || "",
+          guid: ep.guid || ep.audio_url,
+          title: ep.title,
+          description: ep.description || "",
+          published_at: ep.published_at || "",
+          published_ts: ep.published_ts || 0,
+          audio_url: ep.audio_url,
+          duration: ep.duration || "",
+        }),
+      });
+      if (!res.ok) {
+        ep.status = "failed";
+        if (statusCell) statusCell.innerHTML = renderPreviewStatusHtml(ep);
+        if (actionCell) actionCell.innerHTML = renderPreviewActionHtml(ep, idx);
+        toast("Failed to start download");
+      }
+    }
+
+    async function deletePreviewEp(idx) {
+      if (!previewState) return;
+      const ep = previewState.episodes[idx];
+      if (!ep || !ep.file_path) return;
+
+      const res = await fetch(`/api/files?rel_path=${encodeURIComponent(ep.file_path)}`, { method: "DELETE" });
+      if (!res.ok) {
+        toast("Failed to delete file");
+        return;
+      }
+      ep.status = "deleted";
+      ep.file_path = "";
+      ep.file_size = 0;
+
+      const statusCell = document.getElementById(`prev-status-${idx}`);
+      const actionCell = document.getElementById(`prev-action-${idx}`);
+      if (statusCell) statusCell.innerHTML = renderPreviewStatusHtml(ep);
+      if (actionCell) actionCell.innerHTML = renderPreviewActionHtml(ep, idx);
+      toast("File deleted");
+    }
+
+    async function subscribePodcast(item, btn) {
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = "Subscribing...";
+      }
+      const res = await fetch("/api/podcasts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(item),
+      });
+      if (res.status === 409) {
+        subscribedUrls.add(normUrl(item.feed_url));
+        syncSubscribeButtonsInDom();
+        toast("Already subscribed!");
+        return;
+      }
+      if (!res.ok) {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = "Subscribe";
+        }
+        toast("Failed to subscribe");
+        return;
+      }
+      const created = await res.json();
+      subscribedUrls.add(normUrl(item.feed_url));
+      if (created.feed_url) subscribedUrls.add(normUrl(created.feed_url));
+      syncSubscribeButtonsInDom();
+      toast(`Subscribed to ${item.title}`);
+    }
+
+    async function importOpml(input) {
+      if (!input.files.length) return;
+      const form = new FormData();
+      form.append("file", input.files[0]);
+      const res = await fetch("/api/opml/import", { method: "POST", body: form });
+      const data = await res.json();
+      await refreshSubscribedUrls();
+      toast(`Imported ${data.imported} podcast(s)`);
+      input.value = "";
+    }
+
+    async function loadSubscriptions() {
+      const res = await fetch("/api/podcasts");
+      const pods = await res.json();
+      subscribedUrls = new Set(pods.map(p => normUrl(p.feed_url)));
+      const el = document.getElementById("subsList");
+      if (!pods.length) {
+        el.innerHTML = `<p style="color:var(--muted);">No subscriptions yet. Use the Discover tab to add podcasts.</p>`;
+        return;
+      }
+      el.innerHTML = pods.map(p => `
+        <div class="card">
+          <div class="pod-head">
+            <img src="${esc(p.artwork_url)}" alt="" onerror="this.style.visibility='hidden'" />
+            <div>
+              <div class="pod-title">${esc(p.title)}</div>
+              <div class="pod-author">${esc(p.author)}</div>
+              <div style="margin-top:6px;" class="row">
+                <span class="badge ok">${p.downloaded_episodes || 0} / ${p.total_episodes || 0} downloaded</span>
+                <span class="badge">${fmtBytes(p.total_bytes)}</span>
+              </div>
+            </div>
+          </div>
+          <div class="check-row" style="margin:4px 0 0;">
+            <input type="checkbox" ${p.auto_download ? "checked" : ""} onchange="toggleShowAuto(${p.id}, this.checked)" />
+            <label style="font-size:0.85rem;">Auto-download new episodes</label>
+          </div>
+          <div class="row" style="margin-top:auto;">
+            <button class="btn sm" onclick='openShowEpisodes(${p.id}, ${JSON.stringify(p.title)})'>Episodes</button>
+            <button class="btn secondary sm" onclick="syncShow(${p.id})">Sync</button>
+            <button class="btn danger sm" onclick='unsubscribeShow(${p.id}, ${JSON.stringify(p.title)})'>Unsubscribe</button>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    async function toggleShowAuto(id, auto_download) {
+      await fetch(`/api/podcasts/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ auto_download }),
+      });
+      toast("Show setting updated");
+    }
+
+    async function syncShow(id) {
+      toast("Syncing show...");
+      const res = await fetch(`/api/podcasts/${id}/sync`, { method: "POST" });
+      const data = await res.json();
+      toast(`Sync complete (${data.downloaded} downloaded)`);
+      loadSubscriptions();
+    }
+
+    async function unsubscribeShow(id, title) {
+      if (!confirm(`Unsubscribe from "${title}"?`)) return;
+      const deleteFiles = confirm(`Also delete downloaded audio files for "${title}" from shared storage?`);
+      await fetch(`/api/podcasts/${id}?delete_files=${deleteFiles}`, { method: "DELETE" });
+      await refreshSubscribedUrls();
+      if (document.getElementById("searchInput").value.trim()) {
+        runSearch();
+      }
+      toast(`Unsubscribed from ${title}`);
+      loadSubscriptions();
+    }
+
+    function renderShowStatusHtml(ep, prog = null) {
+      if (ep.status === "downloaded") {
+        return `<span class="badge ok">downloaded ${ep.file_size ? `(${fmtBytes(ep.file_size)})` : ""}</span>`;
+      }
+      if (ep.status === "downloading") {
+        return `<span class="badge warn">${esc(formatProgressText(prog))}</span>`;
+      }
+      if (ep.status === "failed") {
+        return `<span class="badge err">failed</span>`;
+      }
+      return `<span class="badge">${esc(ep.status)}</span>`;
+    }
+
+    function renderShowActionHtml(ep, idx) {
+      if (ep.status === "downloaded") {
+        return `<button class="btn danger sm" onclick="deleteEpFile(${idx})">Delete File</button>`;
+      }
+      if (ep.status === "downloading") {
+        return `<button class="btn downloading-btn sm" disabled>Downloading...</button>`;
+      }
+      return `<button class="btn sm" onclick="downloadEp(${idx})">Download</button>`;
+    }
+
+    async function openShowEpisodes(podcastId, title) {
+      previewState = null;
+      activeShowState = null;
+      document.getElementById("modalTitle").textContent = title;
+      document.getElementById("modalActions").innerHTML = `<button class="btn secondary sm" onclick="closeModal()">Close</button>`;
+      document.getElementById("modalBody").innerHTML = "Loading episodes...";
+      document.getElementById("modalBackdrop").classList.add("open");
+
+      const res = await fetch(`/api/podcasts/${podcastId}/episodes`);
+      const eps = await res.json();
+      activeShowState = { podcastId, title, episodes: eps };
+
+      document.getElementById("modalBody").innerHTML = `
+        <table>
+          <thead><tr><th>Date</th><th>Episode</th><th>Duration</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody>
+            ${eps.map((ep, idx) => `
+              <tr>
+                <td style="white-space:nowrap;">${esc(ep.published_at)}</td>
+                <td>
+                  <div>${esc(ep.title)}</div>
+                  ${ep.error_msg ? `<div style="color:var(--red); font-size:0.78rem;">${esc(ep.error_msg)}</div>` : ""}
+                </td>
+                <td style="white-space:nowrap;">${esc(fmtDuration(ep.duration))}</td>
+                <td id="show-status-${idx}">${renderShowStatusHtml(ep)}</td>
+                <td id="show-action-${idx}">${renderShowActionHtml(ep, idx)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+
+      if (eps.some(e => e.status === "downloading")) {
+        ensureProgressPolling();
+        pollDownloadProgress();
+      }
+    }
+
+    async function downloadEp(idx) {
+      if (!activeShowState) return;
+      const ep = activeShowState.episodes[idx];
+      if (!ep || ep.status === "downloading") return;
+
+      ep.status = "downloading";
+      ep.error_msg = "";
+      const statusCell = document.getElementById(`show-status-${idx}`);
+      const actionCell = document.getElementById(`show-action-${idx}`);
+      if (statusCell) statusCell.innerHTML = renderShowStatusHtml(ep, { downloaded_bytes: 0, total_bytes: 0, percent: 0 });
+      if (actionCell) actionCell.innerHTML = renderShowActionHtml(ep, idx);
+
+      ensureProgressPolling();
+
+      const res = await fetch(`/api/episodes/${ep.id}/download`, { method: "POST" });
+      if (!res.ok) {
+        ep.status = "failed";
+        if (statusCell) statusCell.innerHTML = renderShowStatusHtml(ep);
+        if (actionCell) actionCell.innerHTML = renderShowActionHtml(ep, idx);
+        toast("Failed to start download");
+      }
+    }
+
+    async function deleteEpFile(idx) {
+      if (!activeShowState) return;
+      const ep = activeShowState.episodes[idx];
+      if (!ep) return;
+
+      const res = await fetch(`/api/episodes/${ep.id}/file`, { method: "DELETE" });
+      if (!res.ok) {
+        toast("Failed to delete file");
+        return;
+      }
+      ep.status = "deleted";
+      ep.file_path = "";
+      ep.file_size = 0;
+
+      const statusCell = document.getElementById(`show-status-${idx}`);
+      const actionCell = document.getElementById(`show-action-${idx}`);
+      if (statusCell) statusCell.innerHTML = renderShowStatusHtml(ep);
+      if (actionCell) actionCell.innerHTML = renderShowActionHtml(ep, idx);
+      toast("File deleted");
+      loadSubscriptions();
+    }
+
+    function closeModal() {
+      document.getElementById("modalBackdrop").classList.remove("open");
+      previewState = null;
+      activeShowState = null;
+      stopProgressPolling();
+    }
+
+    async function loadFiles() {
+      const res = await fetch("/api/files");
+      const data = await res.json();
+      document.getElementById("storageSummary").textContent =
+        `${data.file_count} files · ${fmtBytes(data.total_bytes)} total in ${data.root}`;
+      const tbody = document.getElementById("filesTableBody");
+      tbody.innerHTML = data.files.map(f => `
+        <tr>
+          <td>${esc(f.folder)}</td>
+          <td>${esc(f.name)}</td>
+          <td>${fmtBytes(f.size)}</td>
+          <td>${esc(f.modified)}</td>
+          <td><button class="btn danger sm" onclick='deleteRawFile(${JSON.stringify(f.rel_path)})'>Delete</button></td>
+        </tr>
+      `).join("");
+    }
+
+    async function deleteRawFile(relPath) {
+      if (!confirm(`Delete ${relPath}?`)) return;
+      await fetch(`/api/files?rel_path=${encodeURIComponent(relPath)}`, { method: "DELETE" });
+      toast("File deleted");
+      loadFiles();
+    }
+
+    async function runCleanup() {
+      const res = await fetch("/api/cleanup", { method: "POST" });
+      const data = await res.json();
+      toast(`Cleanup removed ${data.deleted_episodes} episode(s)`);
+      loadFiles();
+    }
+
+    async function loadSettings() {
+      const res = await fetch("/api/settings");
+      const s = await res.json();
+      document.getElementById("set_primary_index_url").value = s.primary_index_url;
+      document.getElementById("set_enable_primary_index").checked = s.enable_primary_index;
+      document.getElementById("set_enable_itunes_fallback").checked = s.enable_itunes_fallback;
+      document.getElementById("set_auto_download").checked = s.auto_download;
+      document.getElementById("set_poll_interval_minutes").value = s.poll_interval_minutes;
+      document.getElementById("set_initial_episodes").value = s.initial_episodes;
+      document.getElementById("set_max_episodes_per_show").value = s.max_episodes_per_show;
+      document.getElementById("set_retention_days").value = s.retention_days;
+      document.getElementById("set_folder_template").value = s.folder_template;
+      document.getElementById("set_filename_template").value = s.filename_template;
+      document.getElementById("set_save_cover_art").checked = s.save_cover_art;
+      document.getElementById("set_write_nfo").checked = s.write_nfo;
+      updatePathPreview();
+    }
+
+    function updatePathPreview() {
+      const folder = document.getElementById("set_folder_template").value || "{podcast}";
+      const file = document.getElementById("set_filename_template").value || "{date} - {title}.{ext}";
+      const render = str => str
+        .replaceAll("{podcast}", "Darknet Diaries")
+        .replaceAll("{title}", "Ep 150 - Operation Shadow")
+        .replaceAll("{date}", "2026-11-21")
+        .replaceAll("{year}", "2026")
+        .replaceAll("{month}", "11")
+        .replaceAll("{day}", "21")
+        .replaceAll("{ext}", "mp3");
+      document.getElementById("pathPreview").textContent = `/podcasts/${render(folder)}/${render(file)}`;
+    }
+
+    async function saveSettings() {
+      const payload = {
+        primary_index_url: document.getElementById("set_primary_index_url").value.trim(),
+        enable_primary_index: document.getElementById("set_enable_primary_index").checked,
+        enable_itunes_fallback: document.getElementById("set_enable_itunes_fallback").checked,
+        auto_download: document.getElementById("set_auto_download").checked,
+        poll_interval_minutes: Number(document.getElementById("set_poll_interval_minutes").value),
+        initial_episodes: Number(document.getElementById("set_initial_episodes").value),
+        max_episodes_per_show: Number(document.getElementById("set_max_episodes_per_show").value),
+        retention_days: Number(document.getElementById("set_retention_days").value),
+        folder_template: document.getElementById("set_folder_template").value.trim(),
+        filename_template: document.getElementById("set_filename_template").value.trim(),
+        save_cover_art: document.getElementById("set_save_cover_art").checked,
+        write_nfo: document.getElementById("set_write_nfo").checked,
+      };
+      await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      toast("Settings saved");
+    }
+
+    refreshSubscribedUrls();
+    refreshStatus();
+    setInterval(refreshStatus, 8000);
+  </script>
+</body>
+</html>

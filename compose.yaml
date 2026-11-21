@@ -1,0 +1,19 @@
+services:
+  podharvest:
+    build:
+      context: .
+      dockerfile: Containerfile
+    image: localhost/podharvest:latest
+    container_name: podharvest
+#    userns_mode: "keep-id"
+    ports:
+      - "8099:8099"
+    volumes:
+      # Shared host directory where PodHarvest writes episodes and folder.jpg
+      - ./podcasts:/podcasts
+      # Persistent SQLite DB & Web UI settings
+      - ./config:/config
+    environment:
+      - CONFIG_DIR=/config
+      - PODCASTS_DIR=/podcasts
+    restart: unless-stopped
